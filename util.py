@@ -1,3 +1,4 @@
+from pickle import TRUE
 import bpy, bmesh
 from bpy_extras import object_utils
 
@@ -22,15 +23,11 @@ max_angle = 35.0
 start_angle = 7.0
 angle_k = 0.3
 
-# Branch propability data
-max_branch_propability = 0.9
-start_branch_propability = 0.2
-branch_prop_k = 0.8
-
 
 def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
                   initial_radius=1.0, radius_factor=0.8, depth=10,
-                  leaf_size=0.5, leaf_size_deviation=20.0):
+                  leaf_size=0.5, leaf_size_deviation=20.0, max_branch_probability=0.9, start_branch_propability=0.2, 
+                  branch_probability_coeff=0.8):
     random.seed(context.scene.lptg_seed, version=2)
     if not context.mode == "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -50,6 +47,9 @@ def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
     second_radius = initial_radius * radius_factor
     outer_verts, vr_maps = extrude(bm, root_vert, [vertex_radius_map],
                                    second_radius,
+                                   max_branch_probability,
+                                   start_branch_propability,
+                                   branch_probability_coeff,
                                    context=context,
                                    radius_factor=radius_factor,
                                    depth=depth)
@@ -70,33 +70,16 @@ def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
     for i, r in index_radius_maps:
         stem_obj.data.skin_vertices[0].data[i].radius = (r, r)
 
-    # add_leaves2(index_coordinates_map, stem_obj.matrix_world, leaf_mat, stem_obj)
-    # Adding leaves
-    # bm.verts.index_update()
-    random.choices(bpy.data.materials)
-    leaf_mats = [mat for mat in bpy.data.materials if mat.name.startswith(leaf_mat_prefix)]
-    leaves = add_leaves(outer_coordinates, stem_obj.matrix_world,
-                        leaf_mats=leaf_mats, leaf_size=leaf_size,
-                        leaf_size_deviation=leaf_size_deviation,
-                        leaf_geometry=context.scene.lptg_leaf_geometry)
+    print(context.scene.lptg_generate_leaf)
+    if context.scene.lptg_generate_leaf:
+        random.choices(bpy.data.materials)
+        leaf_mats = [mat for mat in bpy.data.materials if mat.name.startswith(leaf_mat_prefix)]
+        leaves = add_leaves(outer_coordinates, stem_obj.matrix_world,
+                            leaf_mats=leaf_mats, leaf_size=leaf_size,
+                            leaf_size_deviation=leaf_size_deviation,
+                            leaf_geometry=context.scene.lptg_leaf_geometry)
 
     stem_obj.data.materials.append(stem_mat)
-
-    scene_coll = bpy.context.scene.collection
-
-    coll_tree = bpy.data.collections.new("Tree")
-    coll_stem = bpy.data.collections.new("Stem")
-    coll_leaves = bpy.data.collections.new("Leaves")
-    coll_tree.children.link(coll_stem)
-    coll_tree.children.link(coll_leaves)
-    coll_stem.objects.link(stem_obj)
-    if stem_obj in scene_coll.objects.values():
-        scene_coll.objects.unlink(stem_obj)
-    for leaf_obj in leaves:
-        coll_leaves.objects.link(leaf_obj)
-        if leaf_obj in scene_coll.objects.values():
-            scene_coll.objects.unlink(leaf_obj)
-    scene_coll.children.link(coll_tree)
 
 
 def angle_func(steps):
@@ -113,9 +96,9 @@ def scale_func(steps, context=None):
                context.scene.lptg_stem_section_length * min_branch_length_factor)
 
 
-def branch_prop_func(steps):
+def branch_prop_func(start_branch_propability, max_branch_propability, branch_probability_coeff, steps):
     coeff = max_branch_propability - start_branch_propability
-    prop = max_branch_propability - coeff * (math.e ** (-steps * branch_prop_k))
+    prop = max_branch_propability - coeff * (math.e ** (-steps * branch_probability_coeff))
     rand_val = random.uniform(0.0, 1.0)
     return rand_val < prop
 
@@ -161,8 +144,8 @@ def branch_extrude(*extrude_args, **extrude_kwargs):
     return [*verts1, *verts2], res_map
 
 
-def extrude(bm, root_vert, vertex_radius_maps, radius, context=None,
-            radius_factor=0.8, depth=1, steps=0,
+def extrude(bm, root_vert, vertex_radius_maps, radius, max_branch_probability, start_branch_propability, branch_probability_coeff,
+            context=None, radius_factor=0.8, depth=1, steps=0,
             translated_root=None, euler=Euler((0.0, 0.0, 0.0), 'XYZ'), outer_verts=[]):
     res_dict = bmesh.ops.extrude_vert_indiv(bm, verts=[root_vert])
     # bm.verts.ensure_lookup_table()
@@ -181,39 +164,27 @@ def extrude(bm, root_vert, vertex_radius_maps, radius, context=None,
     if depth <= 1:
         return [*outer_verts, other_vert], my_vr_maps
     else:
-        if branch_prop_func(steps):
+        if branch_prop_func(start_branch_propability, max_branch_probability, branch_probability_coeff, steps):
             return branch_extrude(bm, other_vert, my_vr_maps, radius * radius_factor,
-                                  context=context,
-                                  depth=depth - 1,
-                                  steps=steps + 1,
-                                  translated_root=my_translated_root)
+                                start_branch_propability,
+                                max_branch_probability,
+                                branch_probability_coeff,
+                                context=context,
+                                depth=depth - 1,
+                                steps=steps + 1,
+                                translated_root=my_translated_root)
         else:
             eulers = rand_rot(my_translated_root, angle_func(steps) / 2.0)
             e = random.choice(eulers)
             return extrude(bm, other_vert, my_vr_maps, radius * radius_factor,
-                           euler=e,
-                           context=context,
-                           depth=depth - 1,
-                           steps=steps + 1,
-                           translated_root=my_translated_root)
-
-
-def add_leaves2(index_coordinates_map, matrix, leaf_mat, stem_obj):
-    # bpy.ops.object.mode_set(mode="OBJECT")
-    for v_index, v in index_coordinates_map:
-        # bpy.ops.object.select_all(action='DESELECT')
-        my_co = matrix @ v
-        bpy.ops.mesh.primitive_ico_sphere_add(
-            radius=1, enter_editmode=False,
-            location=my_co
-        )
-        bpy.ops.transform.resize(
-            value=(0.5, 0.5, 0.5))
-        leaf_obj = bpy.context.active_object
-        if leaf_mat:
-            leaf_obj.data.materials.append(leaf_mat)
-        e, _ = rand_rot(Vector((0.0, 0.0, 1.0)), random.uniform(0, 45))
-        leaf_obj.rotation_euler = e
+                        start_branch_propability,
+                        max_branch_probability,
+                        branch_probability_coeff,
+                        euler=e,
+                        context=context,
+                        depth=depth - 1,
+                        steps=steps + 1,
+                        translated_root=my_translated_root)
 
 
 def add_leaves(outer_coordinates, matrix, leaf_mats=[], leaf_size=0.5,

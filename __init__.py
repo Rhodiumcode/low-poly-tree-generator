@@ -48,7 +48,10 @@ class PerformGeneration(bpy.types.Operator):
                                initial_radius=scene.lptg_init_radius,
                                depth=scene.lptg_branch_depth,
                                leaf_size=scene.lptg_leaf_size,
-                               leaf_size_deviation=scene.lptg_leaf_size_deviation)
+                               leaf_size_deviation=scene.lptg_leaf_size_deviation,
+                               max_branch_probability=scene.lptg_max_branch_probability,
+                               start_branch_propability=scene.lptg_start_branch_probability,
+                               branch_probability_coeff=scene.lptg_branch_probability_coeff)
         except ValueError as e:
             self.report({'ERROR'}, str(e))
         return {'FINISHED'}
@@ -97,6 +100,9 @@ class VIEW3D_PT_low_poly_tree(Panel):
         row.column().prop(context.scene, "lptg_seed")
 
         layout.row().prop(context.scene, "lptg_branch_depth")
+        layout.row().prop(context.scene, "lptg_start_branch_probability")
+        layout.row().prop(context.scene, "lptg_max_branch_probability")
+        layout.row().prop(context.scene, "lptg_branch_probability_coeff")
         layout.row().prop(context.scene, "lptg_init_radius")
         layout.row().prop(context.scene, "lptg_radius_factor")
         layout.row().prop(context.scene, "lptg_stem_section_length")
@@ -110,9 +116,11 @@ class VIEW3D_PT_low_poly_tree(Panel):
         row.column().label(text="Leaf material prefix")
         row.column().prop(context.scene, "lptg_leaf_material")
 
+        layout.row().prop(context.scene, "lptg_generate_leaf")
         row = layout.row()
         row.column().label(text="Leaf geometry")
         row.column().prop(context.scene, "lptg_leaf_geometry")
+        layout.row().prop_search(context.scene, "lptg_leaf_object", context.scene, "objects")
 
         layout.row().prop(context.scene, "lptg_leaf_size")
         layout.row().prop(context.scene, "lptg_leaf_size_deviation")
@@ -140,6 +148,13 @@ def register():
         name="", description="Every material which begins with this prefix will be "
                              "considered as leaf material. The individual material is "
                              "chosen randomly for each leaf.")
+    bpy.types.Scene.lptg_generate_leaf = BoolProperty(
+        name="Generate Leaf", 
+        description="True to generate leaf, false otherwise.", default=True)
+    bpy.types.Scene.lptg_leaf_object = StringProperty(
+        name="Leaf Object",
+        description="Leaf object to be used if 'Leaf Object' is choosed in the geometry field."
+    )
     bpy.types.Scene.lptg_init_radius = FloatProperty(
         default=1.0, min=0.0, max=10.0,
         name="Root radius",
@@ -148,6 +163,18 @@ def register():
         default=0.8, min=0.05, max=1.0,
         name="Radius factor",
         description="Factor by which the stem radius gets smaller after each section")
+    bpy.types.Scene.lptg_start_branch_probability = FloatProperty(
+        default=0.2, min=0.01, max=1.0,
+        name="Start branch probability",
+        description="Start of branch probability")
+    bpy.types.Scene.lptg_max_branch_probability = FloatProperty(
+        default=0.9, min=0.01, max=1.0,
+        name="Max branch probability",
+        description="Cap of branch probability")
+    bpy.types.Scene.lptg_branch_probability_coeff = FloatProperty(
+        default=0.8, min=0.01, max=1.0,
+        name="Branch probability coefficient",
+        description="Coefficient of branch probability")
     bpy.types.Scene.lptg_stem_section_length = FloatProperty(
         default=2.0, min=0.05, max=10.0,
         name="Initial stem length",
@@ -158,7 +185,8 @@ def register():
         description="Factor by which the stem length gets smaller after each section")
     bpy.types.Scene.lptg_leaf_geometry = EnumProperty(
         items=[('mesh.primitive_cube_add', "Cube", "Cube mesh", 'CUBE', 0),
-               ('mesh.primitive_ico_sphere_add', "Sphere", "Sphere mesh", 'MESH_ICOSPHERE', 1)],
+               ('mesh.primitive_ico_sphere_add', "Sphere", "Sphere mesh", 'MESH_ICOSPHERE', 1),
+               ('mesh.custom', "Leaf Object", "Leaf object mesh", 'LEAF_OBJECT', 2)],
         default='mesh.primitive_ico_sphere_add',
         name="",
         description="The geometry mesh from which the leaves are created",)
