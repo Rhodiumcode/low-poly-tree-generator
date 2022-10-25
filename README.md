@@ -1,5 +1,17 @@
 # Blender low poly tree generator
 
+## **Rhodiumcode fork of [the one](https://github.com/LuFlo/low-poly-tree-generator) made by Lukas Florea**
+
+Modifications:
+----
+
+- Allows disabling leaf generation.
+- Exposes probability range and "k" parameter to adjust.
+- Removed additional collections created, it simply dumps generated object into scene.
+
+Original README:
+----
+
 ![Tree example image](doc/images/tree_example_with_ui.png)
 
 This add-on creates procedural low-poly style trees in Blender 2.8+. It is still in early
