@@ -55,7 +55,8 @@ class PerformGeneration(bpy.types.Operator):
                                leaf_size_deviation=scene.lptg_leaf_size_deviation,
                                max_branch_probability=scene.lptg_max_branch_probability,
                                start_branch_propability=scene.lptg_start_branch_probability,
-                               branch_probability_coeff=scene.lptg_branch_probability_coeff)
+                               branch_probability_coeff=scene.lptg_branch_probability_coeff,
+                               angle_profiles=[scene.lptg_angles_1, scene.lptg_angles_2, scene.lptg_angles_3])
             if scene.lptg_generate_seed_on_generate:
                 generate_seed_for_scene(scene)
         except ValueError as e:
@@ -119,6 +120,12 @@ class VIEW3D_PT_low_poly_tree(Panel):
         branchBox.row().prop(context.scene, "lptg_stem_section_length")
         branchBox.row().prop(context.scene, "lptg_stem_length_factor")
 
+        angleBox = layout.box()
+        angleBox.label(text="Profile")
+        angleBox.row().prop(context.scene, "lptg_angles_1", text="Angle Range 1/3")
+        angleBox.row().prop(context.scene, "lptg_angles_2", text="Angle Range 2/3")
+        angleBox.row().prop(context.scene, "lptg_angles_3", text="Angle Range 3/3")
+
         row = branchBox.row()
         row.column().label(text="Stem material")
         row.column().prop(context.scene, "lptg_stem_material")
@@ -171,6 +178,18 @@ def register():
         name="Leaf Object",
         description="Leaf object to be used if 'Leaf Object' is choosed in the geometry field."
     )
+    bpy.types.Scene.lptg_angles_1 = FloatVectorProperty(
+        default=(7, 35), min=0, max=90, size=2,
+        name="Angle Range 1",
+        description="Angle range of the first 1/3 of branches")
+    bpy.types.Scene.lptg_angles_2 = FloatVectorProperty(
+        default=(7, 35), min=0, max=90, size=2,
+        name="Angle Range 2",
+        description="Angle range of the 1/3 - 2/3 of branches")
+    bpy.types.Scene.lptg_angles_3 = FloatVectorProperty(
+        default=(7, 35), min=0, max=90, size=2,
+        name="Angle Range 3",
+        description="Angle range of the rest of branches")
     bpy.types.Scene.lptg_init_radius = FloatProperty(
         default=1.0, min=0.0, max=10.0,
         name="Root radius",

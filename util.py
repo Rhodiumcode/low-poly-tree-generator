@@ -19,15 +19,13 @@ min_branch_length_factor = 0.2
 initial_branch_length = 2.0
 
 # Angle params
-max_angle = 35.0
-start_angle = 7.0
 angle_k = 0.3
 
 
 def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
                   initial_radius=1.0, radius_factor=0.8, depth=10,
                   leaf_size=0.5, leaf_size_deviation=20.0, max_branch_probability=0.9, start_branch_propability=0.2, 
-                  branch_probability_coeff=0.8):
+                  branch_probability_coeff=0.8, angle_profiles = []):
     random.seed(context.scene.lptg_seed, version=2)
     if not context.mode == "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -50,6 +48,7 @@ def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
                                    max_branch_probability,
                                    start_branch_propability,
                                    branch_probability_coeff,
+                                   angle_profiles,
                                    context=context,
                                    radius_factor=radius_factor,
                                    depth=depth)
@@ -82,9 +81,15 @@ def generate_tree(context, stem_mat=None, leaf_mat_prefix=None,
     stem_obj.data.materials.append(stem_mat)
 
 
-def angle_func(steps):
+def angle_func(depth, angle_profiles, steps):
     """ Return the angle based on the steps
     """
+    stepRelative = math.floor(steps / depth)
+    max_angle = 75
+    start_angle = 5
+    if stepRelative < len(angle_profiles): 
+        start_angle = angle_profiles[stepRelative][0]
+        max_angle = angle_profiles[stepRelative][1]
     return max_angle - (max_angle - start_angle) * (math.e ** (-steps * angle_k))
 
 
@@ -128,9 +133,10 @@ def rot_and_add_vert(vert, root_vert, translated_root, euler, steps,
 def branch_extrude(*extrude_args, **extrude_kwargs):
     # e1 = Euler((0.0, radians(20), 0.0), 'XYZ')
     # e2 = Euler((0.0, radians(-20), 0.0), 'XYZ')
+    print(extrude_kwargs)
     e1, e2 = rand_rot(
         extrude_kwargs['translated_root'],
-        angle_func(extrude_kwargs['steps'])
+        angle_func(extrude_kwargs['depth'], extrude_kwargs['angle_profiles'], extrude_kwargs['steps'])
     )
     kwargs1 = {**extrude_kwargs, 'euler': e1}
     kwargs2 = {**extrude_kwargs, 'euler': e2}
@@ -145,6 +151,7 @@ def branch_extrude(*extrude_args, **extrude_kwargs):
 
 
 def extrude(bm, root_vert, vertex_radius_maps, radius, max_branch_probability, start_branch_propability, branch_probability_coeff,
+            angle_profiles=[],
             context=None, radius_factor=0.8, depth=1, steps=0,
             translated_root=None, euler=Euler((0.0, 0.0, 0.0), 'XYZ'), outer_verts=[]):
     res_dict = bmesh.ops.extrude_vert_indiv(bm, verts=[root_vert])
@@ -169,17 +176,19 @@ def extrude(bm, root_vert, vertex_radius_maps, radius, max_branch_probability, s
                                 start_branch_propability,
                                 max_branch_probability,
                                 branch_probability_coeff,
+                                angle_profiles=angle_profiles,
                                 context=context,
                                 depth=depth - 1,
                                 steps=steps + 1,
                                 translated_root=my_translated_root)
         else:
-            eulers = rand_rot(my_translated_root, angle_func(steps) / 2.0)
+            eulers = rand_rot(my_translated_root, angle_func(depth, angle_profiles, steps) / 2.0)
             e = random.choice(eulers)
             return extrude(bm, other_vert, my_vr_maps, radius * radius_factor,
                         start_branch_propability,
                         max_branch_probability,
                         branch_probability_coeff,
+                        angle_profiles,
                         euler=e,
                         context=context,
                         depth=depth - 1,
