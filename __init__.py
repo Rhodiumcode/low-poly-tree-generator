@@ -28,6 +28,10 @@ from bpy.types import PropertyGroup, Panel
 from . import util
 
 
+def generate_seed_for_scene(scene):
+    letter = string.ascii_letters
+    scene.lptg_seed = ''.join(random.choice(letter) for i in range(10))
+
 class PerformGeneration(bpy.types.Operator):
     """Tooltip"""
     bl_idname = "object.generate_tree"
@@ -52,6 +56,8 @@ class PerformGeneration(bpy.types.Operator):
                                max_branch_probability=scene.lptg_max_branch_probability,
                                start_branch_propability=scene.lptg_start_branch_probability,
                                branch_probability_coeff=scene.lptg_branch_probability_coeff)
+            if scene.lptg_generate_seed_on_generate:
+                generate_seed_for_scene(scene)
         except ValueError as e:
             self.report({'ERROR'}, str(e))
         return {'FINISHED'}
@@ -70,8 +76,7 @@ class NewSeed(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
         try:
-            letter = string.ascii_letters
-            scene.lptg_seed = ''.join(random.choice(letter) for i in range(10))
+            generate_seed_for_scene(scene)
         except ValueError as e:
             self.report({'ERROR'}, str(e))
         return {'FINISHED'}
@@ -92,38 +97,46 @@ class VIEW3D_PT_low_poly_tree(Panel):
     def draw(self, context):
         layout = self.layout
 
-        row = layout.row()
+        seedBox = layout.box()
+        seedBox.label(text="Seed")
+        row = seedBox.row()
         row.operator("object.new_seed")
 
-        row = layout.row()
+        row = seedBox.row()
         row.column().label(text="Seed")
         row.column().prop(context.scene, "lptg_seed")
 
-        layout.row().prop(context.scene, "lptg_branch_depth")
-        layout.row().prop(context.scene, "lptg_start_branch_probability")
-        layout.row().prop(context.scene, "lptg_max_branch_probability")
-        layout.row().prop(context.scene, "lptg_branch_probability_coeff")
-        layout.row().prop(context.scene, "lptg_init_radius")
-        layout.row().prop(context.scene, "lptg_radius_factor")
-        layout.row().prop(context.scene, "lptg_stem_section_length")
-        layout.row().prop(context.scene, "lptg_stem_length_factor")
+        seedBox.prop(context.scene, "lptg_generate_seed_on_generate")
 
-        row = layout.row()
+        branchBox = layout.box()
+        branchBox.label(text="Branch")
+        branchBox.row().prop(context.scene, "lptg_branch_depth")
+        branchBox.row().prop(context.scene, "lptg_start_branch_probability")
+        branchBox.row().prop(context.scene, "lptg_max_branch_probability")
+        branchBox.row().prop(context.scene, "lptg_branch_probability_coeff")
+        branchBox.row().prop(context.scene, "lptg_init_radius")
+        branchBox.row().prop(context.scene, "lptg_radius_factor")
+        branchBox.row().prop(context.scene, "lptg_stem_section_length")
+        branchBox.row().prop(context.scene, "lptg_stem_length_factor")
+
+        row = branchBox.row()
         row.column().label(text="Stem material")
         row.column().prop(context.scene, "lptg_stem_material")
 
-        row = layout.row()
+        leafBox = layout.box()
+        leafBox.label(text="Leaf")
+        row = leafBox.row()
         row.column().label(text="Leaf material prefix")
         row.column().prop(context.scene, "lptg_leaf_material")
 
-        layout.row().prop(context.scene, "lptg_generate_leaf")
-        row = layout.row()
+        leafBox.row().prop(context.scene, "lptg_generate_leaf")
+        row = leafBox.row()
         row.column().label(text="Leaf geometry")
         row.column().prop(context.scene, "lptg_leaf_geometry")
-        layout.row().prop_search(context.scene, "lptg_leaf_object", context.scene, "objects")
+        leafBox.row().prop_search(context.scene, "lptg_leaf_object", context.scene, "objects")
 
-        layout.row().prop(context.scene, "lptg_leaf_size")
-        layout.row().prop(context.scene, "lptg_leaf_size_deviation")
+        leafBox.row().prop(context.scene, "lptg_leaf_size")
+        leafBox.row().prop(context.scene, "lptg_leaf_size_deviation")
 
         row = layout.row()
         row.operator("object.generate_tree")
@@ -148,6 +161,9 @@ def register():
         name="", description="Every material which begins with this prefix will be "
                              "considered as leaf material. The individual material is "
                              "chosen randomly for each leaf.")
+    bpy.types.Scene.lptg_generate_seed_on_generate = BoolProperty(
+        name="Generate New Seed Everytime", 
+        description="True to generate a new seed everytime generate tree is pressed.", default=False)
     bpy.types.Scene.lptg_generate_leaf = BoolProperty(
         name="Generate Leaf", 
         description="True to generate leaf, false otherwise.", default=True)

@@ -8,6 +8,7 @@ Modifications:
 - Allows disabling leaf generation.
 - Exposes probability range and "k" parameter to adjust.
 - Removed additional collections created, it simply dumps generated object into scene.
+- Allow option to generate new seed everytime a tree is generated.
 
 Original README:
 ----
